@@ -1,72 +1,55 @@
 # coco_converter.py
 import os
 import json
-from extract_sqlite_annotations import load_annotations
 
+IMG_W = IMG_H = 500
 
-def patches_to_coco(patch_dir, output_json):
-    # Make sure output folder exists
-    os.makedirs(os.path.dirname(output_json), exist_ok=True)
-
+def build_coco(patch_dir, out_json):
     images = []
     annotations = []
-    img_id_counter = 1
-    anno_id_counter = 1
-    categories = {}
+    ann_id = 1
+    img_id = 1
 
-    # Loop through all images in patch directory
-    for fname in os.listdir(patch_dir):
+    for fname in sorted(os.listdir(patch_dir)):
         if not fname.endswith(".png"):
             continue
 
-        img_path = os.path.join(patch_dir, fname)
-        json_path = img_path.replace(".png", ".json")
+        base = fname.replace(".png", "")
+        json_path = os.path.join(patch_dir, base + ".json")
+        if not os.path.exists(json_path):
+            continue
 
-        # Create image entry
         images.append({
-            "id": img_id_counter,
+            "id": img_id,
             "file_name": fname,
-            "height": 500,
-            "width": 500
+            "width": IMG_W,
+            "height": IMG_H
         })
 
-        # Load annotations if exists
-        if os.path.exists(json_path):
-            with open(json_path, "r") as f:
-                annos_list = json.load(f)
+        with open(json_path) as f:
+            annos = json.load(f)
 
-            for a in annos_list:
-                x, y, w, h = a["bbox"]
-                class_id = int(a["class_id"])
+        for a in annos:
+            x, y, w, h = a["bbox"]
+            annotations.append({
+                "id": ann_id,
+                "image_id": img_id,
+                "category_id": a["class_id"],
+                "bbox": [x, y, w, h],
+                "area": w * h,
+                "iscrowd": 0
+            })
+            ann_id += 1
 
-                categories[class_id] = True  # track all class ids
+        img_id += 1
 
-                annotations.append({
-                    "id": anno_id_counter,
-                    "image_id": img_id_counter,
-                    "category_id": class_id,
-                    "bbox": [x, y, w, h],
-                    "area": w * h,
-                    "iscrowd": 0
-                })
+    categories = [{"id": i, "name": str(i)} for i in range(7)]
 
-                anno_id_counter += 1
+    with open(out_json, "w") as f:
+        json.dump({
+            "images": images,
+            "annotations": annotations,
+            "categories": categories
+        }, f, indent=2)
 
-        img_id_counter += 1
-
-    # Create COCO-style categories
-    coco_categories = [
-        {"id": cid, "name": str(cid)} for cid in sorted(categories.keys())
-    ]
-
-    coco_dict = {
-        "images": images,
-        "annotations": annotations,
-        "categories": coco_categories
-    }
-
-    # Save JSON
-    with open(output_json, "w") as f:
-        json.dump(coco_dict, f, indent=2)
-
-    print(f"COCO JSON saved → {output_json}")
+    print(f"COCO saved → {out_json}")
