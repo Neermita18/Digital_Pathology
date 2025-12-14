@@ -1,2 +1,3 @@
 work in progress - lots of digital pathology/medical imaging projects...
+
 currently working on Mitosis Detection in Canine Cutaneous Mast Cell Tumor 
